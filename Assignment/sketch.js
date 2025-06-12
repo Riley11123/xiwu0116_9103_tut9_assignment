@@ -8,6 +8,7 @@ let horizontal = true;
 let clickCount = 0;
 let gameStarted = false;
 let instructionsVisible = true;
+let lineWidth = 6; // Width of each line for rectangle offset
 
 function setup() { // Initialize canvas and display instructions
   createCanvas(windowWidth, windowHeight);
@@ -64,12 +65,10 @@ function doubleClicked() { // Handle double-click to generate and fill rectangle
 
   for (let i = 0; i < hLines.length - 1; i++) {
     for (let j = 0; j < vLines.length - 1; j++) {
-      let x = vLines[j];
-      let y = hLines[i];
-      let w = vLines[j + 1] - x;
-      let h = hLines[i + 1] - y;
-      let cx = x + w / 2;
-      let cy = y + h / 2;
+      let x = vLines[j] + lineWidth / 2;
+      let y = hLines[i] + lineWidth / 2;
+      let w = vLines[j + 1] - vLines[j] - lineWidth;
+      let h = hLines[i + 1] - hLines[i] - lineWidth;
 
       if (mouseX > x && mouseX < x + w && mouseY > y && mouseY < y + h) {
         let neighbors = getNeighborColors(x, y, w, h);
@@ -87,13 +86,11 @@ function doubleClicked() { // Handle double-click to generate and fill rectangle
 function getNeighborColors(x, y, w, h) { // Check neighbor rectangles for color constraints
   let neighbors = [];
   for (let r of filledRects) {
-    let alignedH = r.y === y && r.h === h;
-    let alignedV = r.x === x && r.w === w;
     if (
-      (r.x === x && abs(r.y + r.h - y) < 2) ||
-      (r.x === x && abs(y + h - r.y) < 2) ||
-      (r.y === y && abs(r.x + r.w - x) < 2) ||
-      (r.y === y && abs(x + w - r.x) < 2)
+      (abs(r.y + r.h - y) <= lineWidth && r.x < x + w && r.x + r.w > x) ||  // Top
+      (abs(y + h - r.y) <= lineWidth && r.x < x + w && r.x + r.w > x) ||  // Bottom
+      (abs(r.x + r.w - x) <= lineWidth && r.y < y + h && r.y + r.h > y) || // Left
+      (abs(x + w - r.x) <= lineWidth && r.y < y + h && r.y + r.h > y)      // Right
     ) {
       neighbors.push(r.color);
     }
@@ -109,7 +106,7 @@ function draw() { // Main draw function, handles all layers
   }
 
   stroke(0);
-  strokeWeight(6);
+  strokeWeight(lineWidth);
   for (let l of postLines) {
     if (l.type === 'v') line(l.pos, 0, l.pos, height);
     else line(0, l.pos, width, l.pos);
@@ -122,7 +119,7 @@ function draw() { // Main draw function, handles all layers
   }
 
   stroke(0);
-  strokeWeight(6);
+  strokeWeight(lineWidth);
   for (let l of preLines) {
     if (l.type === 'v') line(l.pos, 0, l.pos, height);
     else line(0, l.pos, width, l.pos);
