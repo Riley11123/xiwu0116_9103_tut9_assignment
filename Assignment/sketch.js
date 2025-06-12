@@ -1,16 +1,16 @@
-// Mondrian-style Interactive Sketch with User Input
 let lines = [];
 let preLines = [];
 let postLines = [];
-let rectangles = [];
 let filledRects = [];
 let horizontal = true;
-let clickCount = 0;
 let gameStarted = false;
 let instructionsVisible = true;
-let lineWidth = 6; // Width of each line for rectangle offset
+let lineWidth = 6;
+let pressStartTime = null;
+let pressStartPos = null;
 
-function setup() { // Initialize canvas and display instructions
+
+function setup() {
   createCanvas(windowWidth, windowHeight);
   textAlign(CENTER, CENTER);
   textSize(18);
@@ -19,14 +19,50 @@ function setup() { // Initialize canvas and display instructions
   showInstructions();
 }
 
-function showInstructions() { // Show game rules before interaction starts
+function showInstructions() {
   background(255);
+
+  // 白色圆角背景板设置
+  let boxWidth = Math.floor(width * 0.4);
+  let boxHeight = height * 0.58;
+  let boxX = (width - boxWidth) / 2;
+  let boxY = (height - boxHeight) / 2;
+  let padding = 48;
+  let radius = 30;
+
+  // 绘制白色背景板
+  fill(255);
+  stroke(0);
+  strokeWeight(2);
+  rect(boxX, boxY, boxWidth, boxHeight, radius);
+
+  // 设置文字样式
+  textAlign(LEFT, TOP);
+  textSize(18);
+  textLeading(28); // 增加行距
   fill(0);
   noStroke();
-  text("Click the edge of the canvas to add lines. Click to add straight lines. Double-click to generate rectangles (please double-click only after more than 5 lines are created).\nFeel free to create your own Mondrian-style artwork!\nClick any blank area to start.", width / 2, height / 2);
+
+  // 文本框起点与最大宽度
+  let x = boxX + padding;
+  let y = boxY + padding;
+  let tw = boxWidth - padding * 2;
+
+  // 拼接整段文字
+  let msg = 
+    "Welcome to the Mondrian Canvas!\n" +
+    "Here you can create your own unique Mondrian-style artwork.\n\n" +
+    "Rules:\n" +
+    "Rule 1: Click on the edge of the canvas to add straight lines. Once there are more than 5 lines, Rule 2 will be enabled.\n" +
+    "Rule 2: Double-click on a rectangle formed by the lines to fill it with red, yellow, or blue. You can double-click again to change the color.\n" +
+    "Rule 3: Long-press on a filled rectangle for 2 seconds to turn it white. This makes the rectangle unchangeable and is useful for removing colors.\n\n" +
+    "Click any blank area to start your creation!";
+
+  text(msg, x, y, tw); // 自动换行绘制
 }
 
-function mousePressed() { // Handle mouse click to add lines
+
+function mousePressed() {
   if (!gameStarted) {
     gameStarted = true;
     instructionsVisible = false;
@@ -35,29 +71,47 @@ function mousePressed() { // Handle mouse click to add lines
     return;
   }
 
+  pressStartTime = millis();
+  pressStartPos = { x: mouseX, y: mouseY };
+
   let edgeMargin = 30;
   if (
     mouseX < edgeMargin || mouseX > width - edgeMargin ||
     mouseY < edgeMargin || mouseY > height - edgeMargin
   ) {
-    let newLine;
-    if (mouseX > mouseY) {
-      newLine = { type: 'v', pos: mouseX }; // Vertical line
-    } else {
-      newLine = { type: 'h', pos: mouseY }; // Horizontal line
-    }
+    let newLine = (mouseX > mouseY)
+      ? { type: 'v', pos: mouseX }
+      : { type: 'h', pos: mouseY };
 
-    if (filledRects.length === 0) {
-      preLines.push(newLine);
-    } else {
-      postLines.push(newLine);
-    }
+    if (filledRects.length === 0) preLines.push(newLine);
+    else postLines.push(newLine);
     lines.push(newLine);
     redraw();
   }
 }
 
-function doubleClicked() { // Handle double-click to generate and fill rectangles
+function mouseReleased() {
+  if (!pressStartTime) return;
+
+  let heldTime = millis() - pressStartTime;
+  if (heldTime >= 2000) {
+    for (let r of filledRects) {
+      if (
+        pressStartPos.x > r.x && pressStartPos.x < r.x + r.w &&
+        pressStartPos.y > r.y && pressStartPos.y < r.y + r.h
+      ) {
+        r.color = [255, 255, 255]; // turn white
+        redraw();
+        break;
+      }
+    }
+  }
+
+  pressStartTime = null;
+  pressStartPos = null;
+}
+
+function doubleClicked() {
   if (lines.length < 5) return;
 
   let hLines = lines.filter(l => l.type === 'h').map(l => l.pos).sort((a, b) => a - b);
@@ -83,14 +137,14 @@ function doubleClicked() { // Handle double-click to generate and fill rectangle
   }
 }
 
-function getNeighborColors(x, y, w, h) { // Check neighbor rectangles for color constraints
+function getNeighborColors(x, y, w, h) {
   let neighbors = [];
   for (let r of filledRects) {
     if (
-      (abs(r.y + r.h - y) <= lineWidth && r.x < x + w && r.x + r.w > x) ||  // Top
-      (abs(y + h - r.y) <= lineWidth && r.x < x + w && r.x + r.w > x) ||  // Bottom
-      (abs(r.x + r.w - x) <= lineWidth && r.y < y + h && r.y + r.h > y) || // Left
-      (abs(x + w - r.x) <= lineWidth && r.y < y + h && r.y + r.h > y)      // Right
+      (abs(r.y + r.h - y) <= lineWidth && r.x < x + w && r.x + r.w > x) ||
+      (abs(y + h - r.y) <= lineWidth && r.x < x + w && r.x + r.w > x) ||
+      (abs(r.x + r.w - x) <= lineWidth && r.y < y + h && r.y + r.h > y) ||
+      (abs(x + w - r.x) <= lineWidth && r.y < y + h && r.y + r.h > y)
     ) {
       neighbors.push(r.color);
     }
@@ -98,7 +152,7 @@ function getNeighborColors(x, y, w, h) { // Check neighbor rectangles for color 
   return neighbors;
 }
 
-function draw() { // Main draw function, handles all layers
+function draw() {
   background(255);
   if (instructionsVisible) {
     showInstructions();
